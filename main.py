@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QListWidget, QListWidgetItem, QSlider,
     QFileDialog, QMessageBox, QInputDialog, QStyle, QSplitter, QMenu,
     QAbstractItemView, QStackedWidget, QDialog, QDialogButtonBox,
-    QLineEdit, QPlainTextEdit, QFormLayout
+    QLineEdit, QPlainTextEdit, QFormLayout, QComboBox, QFrame
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import (
@@ -30,11 +30,11 @@ from mutagen.asf import ASF
 
 
 SETTINGS_FILE    = Path.home() / ".mp3_player.json"
-SETTINGS_VERSION = 3
+SETTINGS_VERSION = 4
 COVER_SIZE       = 48
 PL_COVER_SIZE    = 46
 PL_COVER_SAVE    = 128
-HEADER_COVER     = 96    # was 72 — playlist page top is now bigger
+HEADER_COVER     = 96
 EDIT_COVER       = 110
 TRACK_EDIT_COVER = 130
 NUM_WIDTH        = 30
@@ -54,6 +54,302 @@ def _dbg(*a):
         print("[metadata]", *a)
 
 
+# ==================================================================
+#  Translations
+# ==================================================================
+LANGUAGES = [
+    ("en", "English"),
+    ("ru", "Русский"),
+]
+
+TRANSLATIONS: dict[str, dict[str, str]] = {
+    "en": {
+        "app_title": "MP3 Player",
+        "playlists": "Playlists",
+        "new_playlist_tip": "New playlist",
+        "settings_tip": "Settings",
+
+        # Playlist header
+        "no_playlist_selected": "No playlist selected",
+        "drop_to_add": "Drop audio files here to add",
+        "tracks_one": "{n} track",
+        "tracks_many": "{n} tracks",
+
+        # Song list
+        "songs_tooltip":
+            "Drop audio files here to add them to the current playlist.\n"
+            "Drag tracks to reorder them.\n"
+            "Right-click a track for more options.",
+        "no_track_loaded": "No track loaded",
+        "unknown_title": "Unknown title",
+        "unknown_artist": "Unknown artist",
+        "missing_suffix": "   ⚠ file missing",
+
+        # Context menus — playlist
+        "menu_edit": "Edit…",
+        "menu_rename": "Rename…",
+        "menu_delete": "Delete",
+        "menu_set_cover": "Set cover…",
+        "menu_clear_cover": "Clear cover",
+
+        # Context menus — track
+        "menu_edit_metadata": "Edit metadata…",
+        "menu_remove_one": "Remove from playlist",
+        "menu_remove_many": "Remove {n} tracks from playlist",
+        "menu_move_up": "Move up",
+        "menu_move_down": "Move down",
+        "menu_move_top": "Move to top",
+        "menu_move_bottom": "Move to bottom",
+
+        # New playlist dialog
+        "dlg_new_playlist": "New playlist",
+        "dlg_playlist_name_placeholder": "Playlist name",
+        "dlg_name_label": "Name:",
+        "btn_choose_image": "Choose image…",
+        "btn_clear": "Clear",
+        "btn_cancel": "Cancel",
+        "btn_save": "Save",
+        "btn_close": "Close",
+        "btn_back": "←  Back",
+
+        # Rename / delete playlist
+        "dlg_rename_playlist": "Rename playlist",
+        "dlg_new_name_label": "New name:",
+        "dlg_delete_playlist": "Delete playlist",
+        "dlg_delete_playlist_msg":
+            'Delete playlist "{name}"?\n(Files on disk are NOT deleted.)',
+
+        # Edit playlist page
+        "edit_playlist_title": "Edit playlist",
+        "label_name": "Name",
+        "label_description": "Description",
+        "placeholder_description": "Optional description…",
+        "btn_clear_cover": "Clear cover",
+
+        # Track metadata dialog
+        "dlg_edit_metadata": "Edit track metadata",
+        "label_file": "File: {name}",
+        "label_title": "Title:",
+        "label_artist": "Artist:",
+        "label_album": "Album:",
+        "placeholder_title": "Song title",
+        "placeholder_artist": "Artist name",
+        "placeholder_album": "Album name",
+        "metadata_hint":
+            "Changes are written to the audio file itself and will be "
+            "visible in other players.",
+
+        # Settings page
+        "settings": "Settings",
+        "language": "Language",
+        "settings_hint":
+            "Choose the language used throughout the app. "
+            "The change takes effect immediately and is remembered "
+            "for next launch.",
+
+        # Messages
+        "msg_name_required_title": "Name required",
+        "msg_name_required_playlist": "Please enter a playlist name.",
+        "msg_name_required_song": "Please enter a song title.",
+        "msg_already_exists_title": "Already exists",
+        "msg_already_exists": 'Playlist "{name}" already exists.',
+        "msg_name_taken_title": "Name taken",
+        "msg_playlist_empty": "Playlist name cannot be empty.",
+        "msg_file_missing_title": "File missing",
+        "msg_file_missing": "File not found:\n{path}",
+        "msg_cannot_edit_missing":
+            "Cannot edit metadata — file not found.",
+        "msg_playback_error_title": "Playback error",
+        "msg_image_load_title": "Could not load image",
+        "msg_image_load": "Qt could not decode this image file.",
+        "msg_encode_failed_title": "Encode failed",
+        "msg_encode_failed": "Could not encode cover image.",
+        "msg_save_failed_title": "Could not save metadata",
+        "msg_saved_with_note_title": "Saved with note",
+        "msg_read_failed_title": "Read failed",
+
+        # Metadata writer errors / notes
+        "err_file_not_found": "File not found.",
+        "err_file_not_writable":
+            "File is not writable (check permissions).",
+        "err_unsupported_format": "Unsupported file format.",
+        "err_could_not_write_text": "Could not write text tags:\n{err}",
+        "err_could_not_write_cover": "Could not write cover:\n{err}",
+        "err_could_not_reopen":
+            "Could not reopen file for cover write:\n{err}",
+        "note_cover_not_supported_wma":
+            "Text tags saved.\nCover writing is not supported for WMA files.",
+        "note_cover_not_supported_generic":
+            "Text tags saved.\nCover writing is not supported for this format.",
+    },
+
+    "ru": {
+        "app_title": "MP3 Плеер",
+        "playlists": "Плейлисты",
+        "new_playlist_tip": "Новый плейлист",
+        "settings_tip": "Настройки",
+
+        "no_playlist_selected": "Плейлист не выбран",
+        "drop_to_add": "Перетащите аудиофайлы сюда",
+        "tracks_one": "{n} трек",
+        "tracks_many": "{n} треков",
+
+        "songs_tooltip":
+            "Перетащите аудиофайлы сюда, чтобы добавить их в текущий плейлист.\n"
+            "Перетаскивайте треки для изменения порядка.\n"
+            "Щёлкните правой кнопкой по треку для дополнительных действий.",
+        "no_track_loaded": "Трек не загружен",
+        "unknown_title": "Неизвестное название",
+        "unknown_artist": "Неизвестный исполнитель",
+        "missing_suffix": "   ⚠ файл не найден",
+
+        "menu_edit": "Изменить…",
+        "menu_rename": "Переименовать…",
+        "menu_delete": "Удалить",
+        "menu_set_cover": "Установить обложку…",
+        "menu_clear_cover": "Убрать обложку",
+
+        "menu_edit_metadata": "Изменить метаданные…",
+        "menu_remove_one": "Удалить из плейлиста",
+        "menu_remove_many": "Удалить {n} треков из плейлиста",
+        "menu_move_up": "Вверх",
+        "menu_move_down": "Вниз",
+        "menu_move_top": "В начало",
+        "menu_move_bottom": "В конец",
+
+        "dlg_new_playlist": "Новый плейлист",
+        "dlg_playlist_name_placeholder": "Название плейлиста",
+        "dlg_name_label": "Название:",
+        "btn_choose_image": "Выбрать изображение…",
+        "btn_clear": "Очистить",
+        "btn_cancel": "Отмена",
+        "btn_save": "Сохранить",
+        "btn_close": "Закрыть",
+        "btn_back": "←  Назад",
+
+        "dlg_rename_playlist": "Переименовать плейлист",
+        "dlg_new_name_label": "Новое имя:",
+        "dlg_delete_playlist": "Удалить плейлист",
+        "dlg_delete_playlist_msg":
+            'Удалить плейлист «{name}»?\n(Файлы на диске НЕ удаляются.)',
+
+        "edit_playlist_title": "Изменить плейлист",
+        "label_name": "Название",
+        "label_description": "Описание",
+        "placeholder_description": "Необязательное описание…",
+        "btn_clear_cover": "Убрать обложку",
+
+        "dlg_edit_metadata": "Изменить метаданные трека",
+        "label_file": "Файл: {name}",
+        "label_title": "Название:",
+        "label_artist": "Исполнитель:",
+        "label_album": "Альбом:",
+        "placeholder_title": "Название песни",
+        "placeholder_artist": "Имя исполнителя",
+        "placeholder_album": "Название альбома",
+        "metadata_hint":
+            "Изменения записываются в сам аудиофайл и будут видны "
+            "в других плеерах.",
+
+        "settings": "Настройки",
+        "language": "Язык",
+        "settings_hint":
+            "Выберите язык интерфейса приложения. "
+            "Изменение применяется сразу и сохраняется "
+            "до следующего запуска.",
+
+        "msg_name_required_title": "Требуется название",
+        "msg_name_required_playlist": "Введите название плейлиста.",
+        "msg_name_required_song": "Введите название песни.",
+        "msg_already_exists_title": "Уже существует",
+        "msg_already_exists": 'Плейлист «{name}» уже существует.',
+        "msg_name_taken_title": "Имя занято",
+        "msg_playlist_empty": "Название плейлиста не может быть пустым.",
+        "msg_file_missing_title": "Файл не найден",
+        "msg_file_missing": "Файл не найден:\n{path}",
+        "msg_cannot_edit_missing":
+            "Невозможно изменить метаданные — файл не найден.",
+        "msg_playback_error_title": "Ошибка воспроизведения",
+        "msg_image_load_title": "Не удалось загрузить изображение",
+        "msg_image_load": "Qt не смог распознать этот файл изображения.",
+        "msg_encode_failed_title": "Ошибка кодирования",
+        "msg_encode_failed": "Не удалось закодировать обложку.",
+        "msg_save_failed_title": "Не удалось сохранить метаданные",
+        "msg_saved_with_note_title": "Сохранено с примечанием",
+        "msg_read_failed_title": "Ошибка чтения",
+
+        "err_file_not_found": "Файл не найден.",
+        "err_file_not_writable": "Нет прав на запись файла (проверьте права).",
+        "err_unsupported_format": "Неподдерживаемый формат файла.",
+        "err_could_not_write_text": "Не удалось записать текстовые теги:\n{err}",
+        "err_could_not_write_cover": "Не удалось записать обложку:\n{err}",
+        "err_could_not_reopen":
+            "Не удалось открыть файл для записи обложки:\n{err}",
+        "note_cover_not_supported_wma":
+            "Теги сохранены.\nЗапись обложки не поддерживается для файлов WMA.",
+        "note_cover_not_supported_generic":
+            "Теги сохранены.\nЗапись обложки не поддерживается для этого формата.",
+    },
+}
+
+
+_current_lang = "en"
+
+
+def set_language(code: str):
+    global _current_lang
+    if code in TRANSLATIONS:
+        _current_lang = code
+
+
+def current_language() -> str:
+    return _current_lang
+
+
+def tr(key: str, **kwargs) -> str:
+    table = TRANSLATIONS.get(_current_lang) or TRANSLATIONS["en"]
+    s = table.get(key)
+    if s is None:
+        s = TRANSLATIONS["en"].get(key, key)
+    if kwargs:
+        try:
+            return s.format(**kwargs)
+        except Exception:
+            return s
+    return s
+
+
+def _plural_ru(n: int, one: str, few: str, many: str) -> str:
+    n = abs(int(n))
+    mod100 = n % 100
+    if 11 <= mod100 <= 19:
+        return many
+    mod10 = n % 10
+    if mod10 == 1:
+        return one
+    if 2 <= mod10 <= 4:
+        return few
+    return many
+
+
+def tr_tracks_count(n: int) -> str:
+    if _current_lang == "ru":
+        return f"{n} " + _plural_ru(n, "трек", "трека", "треков")
+    return tr("tracks_one", n=n) if n == 1 else tr("tracks_many", n=n)
+
+
+def tr_remove_tracks(n: int) -> str:
+    if n == 1:
+        return tr("menu_remove_one")
+    if _current_lang == "ru":
+        word = _plural_ru(n, "трек", "трека", "треков")
+        return f"Удалить {n} {word} из плейлиста"
+    return tr("menu_remove_many", n=n)
+
+
+# ==================================================================
+#  Utility
+# ==================================================================
 def format_duration_seconds(secs) -> str:
     try:
         s = int(round(float(secs)))
@@ -72,17 +368,13 @@ def format_duration_seconds(secs) -> str:
 #  Rounded pixmap helpers
 # ==================================================================
 def rounded_cover(pix: QPixmap | None, size: int, radius: int) -> QPixmap | None:
-    """Scale `pix` to *fill* a `size`×`size` square, center-crop,
-    and clip to a rounded rectangle. Returns None if input is None/empty."""
     if pix is None or pix.isNull():
         return None
-
     scaled = pix.scaled(
         size, size,
         Qt.AspectRatioMode.KeepAspectRatioByExpanding,
         Qt.TransformationMode.SmoothTransformation,
     )
-    # center-crop to a square
     x = max(0, (scaled.width() - size) // 2)
     y = max(0, (scaled.height() - size) // 2)
     cropped = scaled.copy(x, y, size, size)
@@ -106,7 +398,6 @@ def rounded_cover(pix: QPixmap | None, size: int, radius: int) -> QPixmap | None
 def apply_rounded_cover(label: QLabel, pix: QPixmap | None,
                         size: int, radius: int,
                         placeholder_pt: int = 20) -> None:
-    """Set a rounded cover on `label`; fall back to a rounded ♪ placeholder."""
     if pix is not None and not pix.isNull():
         rounded = rounded_cover(pix, size, radius)
         if rounded is not None:
@@ -114,7 +405,6 @@ def apply_rounded_cover(label: QLabel, pix: QPixmap | None,
             label.setText("")
             label.setStyleSheet("background: transparent; border: none;")
             return
-    # placeholder
     label.clear()
     label.setText("♪")
     f = label.font()
@@ -279,14 +569,14 @@ def _guess_image_mime(data: bytes) -> str:
 def write_track_metadata(path: str, title: str, artist: str, album: str,
                          cover_bytes: bytes | None) -> tuple[bool, str]:
     if not os.path.exists(path):
-        return False, "File not found."
+        return False, tr("err_file_not_found")
     if not os.access(path, os.W_OK):
-        return False, "File is not writable (check permissions)."
+        return False, tr("err_file_not_writable")
 
     try:
         easy = MutagenFile(path, easy=True)
         if easy is None:
-            return False, "Unsupported file format."
+            return False, tr("err_unsupported_format")
         if easy.tags is None:
             easy.add_tags()
         for key, value in (("title", title), ("artist", artist), ("album", album)):
@@ -298,14 +588,14 @@ def write_track_metadata(path: str, title: str, artist: str, album: str,
                     del easy[key]
         easy.save()
     except Exception as e:
-        return False, f"Could not write text tags:\n{e}"
+        return False, tr("err_could_not_write_text", err=e)
 
     try:
         audio = MutagenFile(path)
     except Exception as e:
-        return False, f"Could not reopen file for cover write:\n{e}"
+        return False, tr("err_could_not_reopen", err=e)
     if audio is None:
-        return False, "Unsupported file format."
+        return False, tr("err_unsupported_format")
 
     try:
         if isinstance(audio, MP3):
@@ -369,21 +659,19 @@ def write_track_metadata(path: str, title: str, artist: str, album: str,
 
         if isinstance(audio, ASF):
             if cover_bytes:
-                return True, ("Text tags saved.\n"
-                              "Cover writing is not supported for WMA files.")
+                return True, tr("note_cover_not_supported_wma")
             return True, ""
 
         if cover_bytes:
-            return True, ("Text tags saved.\n"
-                          "Cover writing is not supported for this format.")
+            return True, tr("note_cover_not_supported_generic")
         return True, ""
 
     except Exception as e:
-        return False, f"Could not write cover:\n{e}"
+        return False, tr("err_could_not_write_cover", err=e)
 
 
 # ==================================================================
-#  Playlist cover helpers
+#  Cover encoding helpers
 # ==================================================================
 def encode_pixmap_b64(pix: QPixmap) -> str | None:
     buf = QBuffer()
@@ -525,9 +813,9 @@ class TrackRow(QWidget):
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(1)
 
-        title = meta["title"] or "Unknown title"
+        title = meta["title"] or tr("unknown_title")
         if meta.get("missing"):
-            title += "   ⚠ file missing"
+            title += tr("missing_suffix")
         self.title_lbl = QLabel(title)
         f = self.title_lbl.font(); f.setBold(True)
         self.title_lbl.setFont(f)
@@ -535,7 +823,8 @@ class TrackRow(QWidget):
         parts = []
         if meta.get("artist"): parts.append(meta["artist"])
         if meta.get("album"):  parts.append(meta["album"])
-        self.sub_lbl = QLabel("  •  ".join(parts) if parts else "Unknown artist")
+        sub = "  •  ".join(parts) if parts else tr("unknown_artist")
+        self.sub_lbl = QLabel(sub)
         self.sub_lbl.setStyleSheet("color: palette(placeholder-text);")
         f2 = self.sub_lbl.font(); f2.setPointSize(max(8, f2.pointSize() - 1))
         self.sub_lbl.setFont(f2)
@@ -602,7 +891,7 @@ class PlaylistHeader(QWidget):
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(2)
 
-        self.name_lbl = QLabel("No playlist selected")
+        self.name_lbl = QLabel(tr("no_playlist_selected"))
         f = self.name_lbl.font(); f.setBold(True); f.setPointSize(18)
         self.name_lbl.setFont(f)
         self.name_lbl.setWordWrap(True)
@@ -632,7 +921,7 @@ class PlaylistHeader(QWidget):
     def set_playlist(self, name: str | None, cover_pix: QPixmap | None,
                      track_count: int, description: str = ""):
         if not name:
-            self.name_lbl.setText("No playlist selected")
+            self.name_lbl.setText(tr("no_playlist_selected"))
             self.sub_lbl.setText("")
             self.desc_lbl.setVisible(False)
             apply_rounded_cover(self.cover_lbl, None,
@@ -641,10 +930,9 @@ class PlaylistHeader(QWidget):
 
         self.name_lbl.setText(name)
         if track_count == 0:
-            self.sub_lbl.setText("Drop audio files here to add")
+            self.sub_lbl.setText(tr("drop_to_add"))
         else:
-            self.sub_lbl.setText(
-                f"{track_count} track{'s' if track_count != 1 else ''}")
+            self.sub_lbl.setText(tr_tracks_count(track_count))
 
         if description:
             self.desc_lbl.setText(description)
@@ -662,7 +950,7 @@ class PlaylistHeader(QWidget):
 class NewPlaylistDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("New playlist")
+        self.setWindowTitle(tr("dlg_new_playlist"))
         self.setMinimumWidth(380)
         self._cover_b64: str | None = None
 
@@ -671,8 +959,8 @@ class NewPlaylistDialog(QDialog):
 
         form = QFormLayout()
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Playlist name")
-        form.addRow("Name:", self.name_edit)
+        self.name_edit.setPlaceholderText(tr("dlg_playlist_name_placeholder"))
+        form.addRow(tr("dlg_name_label"), self.name_edit)
         lay.addLayout(form)
 
         cover_row = QHBoxLayout()
@@ -687,21 +975,22 @@ class NewPlaylistDialog(QDialog):
 
         btn_col = QVBoxLayout()
         btn_col.setSpacing(4)
-        self.btn_choose = QPushButton("Choose image…")
+        self.btn_choose = QPushButton(tr("btn_choose_image"))
         self.btn_choose.clicked.connect(self._choose_cover)
-        self.btn_clear = QPushButton("Clear")
+        self.btn_clear = QPushButton(tr("btn_clear"))
         self.btn_clear.clicked.connect(self._clear_cover)
         btn_col.addWidget(self.btn_choose)
         btn_col.addWidget(self.btn_clear)
         btn_col.addStretch(1)
         cover_row.addLayout(btn_col)
         cover_row.addStretch(1)
-
         lay.addLayout(cover_row)
 
         bb = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel)
+        bb.button(QDialogButtonBox.StandardButton.Ok).setText(tr("btn_save"))
+        bb.button(QDialogButtonBox.StandardButton.Cancel).setText(tr("btn_cancel"))
         bb.accepted.connect(self._try_accept)
         bb.rejected.connect(self.reject)
         lay.addWidget(bb)
@@ -710,19 +999,19 @@ class NewPlaylistDialog(QDialog):
 
     def _choose_cover(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Choose cover", "",
+            self, tr("btn_choose_image"), "",
             "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;All files (*)")
         if not path:
             return
         pix = scaled_pixmap_from_file(path, PL_COVER_SAVE)
         if pix is None:
-            QMessageBox.warning(self, "Could not load image",
-                                "Qt could not decode this image file.")
+            QMessageBox.warning(self, tr("msg_image_load_title"),
+                                tr("msg_image_load"))
             return
         b64 = encode_pixmap_b64(pix)
         if not b64:
-            QMessageBox.warning(self, "Encode failed",
-                                "Could not encode cover image.")
+            QMessageBox.warning(self, tr("msg_encode_failed_title"),
+                                tr("msg_encode_failed"))
             return
         self._cover_b64 = b64
         apply_rounded_cover(self.cover_lbl, pix,
@@ -735,8 +1024,8 @@ class NewPlaylistDialog(QDialog):
 
     def _try_accept(self):
         if not self.name_edit.text().strip():
-            QMessageBox.warning(self, "Name required",
-                                "Please enter a playlist name.")
+            QMessageBox.warning(self, tr("msg_name_required_title"),
+                                tr("msg_name_required_playlist"))
             return
         self.accept()
 
@@ -754,7 +1043,7 @@ class TrackEditDialog(QDialog):
     def __init__(self, path: str, meta: dict, cover_pix: QPixmap | None,
                  parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit track metadata")
+        self.setWindowTitle(tr("dlg_edit_metadata"))
         self.setMinimumWidth(460)
 
         self._path = path
@@ -763,7 +1052,7 @@ class TrackEditDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.setSpacing(10)
 
-        name_lbl = QLabel(f"File: {Path(path).name}")
+        name_lbl = QLabel(tr("label_file", name=Path(path).name))
         nf = name_lbl.font(); nf.setItalic(True)
         name_lbl.setFont(nf)
         name_lbl.setStyleSheet("color: palette(placeholder-text);")
@@ -780,9 +1069,9 @@ class TrackEditDialog(QDialog):
 
         cbtn_col = QVBoxLayout()
         cbtn_col.setSpacing(6)
-        self.btn_choose_cover = QPushButton("Choose image…")
+        self.btn_choose_cover = QPushButton(tr("btn_choose_image"))
         self.btn_choose_cover.clicked.connect(self._choose_cover)
-        self.btn_clear_cover = QPushButton("Clear cover")
+        self.btn_clear_cover = QPushButton(tr("btn_clear_cover"))
         self.btn_clear_cover.clicked.connect(self._clear_cover)
         cbtn_col.addWidget(self.btn_choose_cover)
         cbtn_col.addWidget(self.btn_clear_cover)
@@ -794,18 +1083,17 @@ class TrackEditDialog(QDialog):
         form = QFormLayout()
         form.setSpacing(8)
         self.title_edit = QLineEdit(meta.get("title", ""))
-        self.title_edit.setPlaceholderText("Song title")
+        self.title_edit.setPlaceholderText(tr("placeholder_title"))
         self.artist_edit = QLineEdit(meta.get("artist", ""))
-        self.artist_edit.setPlaceholderText("Artist name")
+        self.artist_edit.setPlaceholderText(tr("placeholder_artist"))
         self.album_edit = QLineEdit(meta.get("album", ""))
-        self.album_edit.setPlaceholderText("Album name")
-        form.addRow("Title:",  self.title_edit)
-        form.addRow("Artist:", self.artist_edit)
-        form.addRow("Album:",  self.album_edit)
+        self.album_edit.setPlaceholderText(tr("placeholder_album"))
+        form.addRow(tr("label_title"), self.title_edit)
+        form.addRow(tr("label_artist"), self.artist_edit)
+        form.addRow(tr("label_album"), self.album_edit)
         lay.addLayout(form)
 
-        hint = QLabel("Changes are written to the audio file itself "
-                      "and will be visible in other players.")
+        hint = QLabel(tr("metadata_hint"))
         hf = hint.font(); hf.setPointSize(max(8, hf.pointSize() - 1))
         hint.setFont(hf)
         hint.setStyleSheet("color: palette(placeholder-text);")
@@ -816,7 +1104,7 @@ class TrackEditDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel)
         ok_btn = bb.button(QDialogButtonBox.StandardButton.Ok)
-        ok_btn.setText("Save")
+        ok_btn.setText(tr("btn_save"))
         ok_btn.setStyleSheet("""
             QPushButton {
                 background: palette(highlight);
@@ -829,6 +1117,7 @@ class TrackEditDialog(QDialog):
             QPushButton:hover { background: palette(highlight); }
             QPushButton:pressed { background: palette(dark); }
         """)
+        bb.button(QDialogButtonBox.StandardButton.Cancel).setText(tr("btn_cancel"))
         bb.accepted.connect(self._on_save)
         bb.rejected.connect(self.reject)
         lay.addWidget(bb)
@@ -841,19 +1130,19 @@ class TrackEditDialog(QDialog):
 
     def _choose_cover(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Choose cover image", "",
+            self, tr("btn_choose_image"), "",
             "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;All files (*)")
         if not path:
             return
         try:
             data = Path(path).read_bytes()
         except Exception as e:
-            QMessageBox.warning(self, "Read failed", str(e))
+            QMessageBox.warning(self, tr("msg_read_failed_title"), str(e))
             return
         test = QPixmap()
         if not test.loadFromData(data):
-            QMessageBox.warning(self, "Could not load image",
-                                "Qt could not decode this image file.")
+            QMessageBox.warning(self, tr("msg_image_load_title"),
+                                tr("msg_image_load"))
             return
         self._cover_bytes = data
         apply_rounded_cover(self.cover_lbl, test,
@@ -870,23 +1159,23 @@ class TrackEditDialog(QDialog):
         album  = self.album_edit.text().strip()
 
         if not title:
-            QMessageBox.warning(self, "Title required",
-                                "Please enter a song title.")
+            QMessageBox.warning(self, tr("msg_name_required_title"),
+                                tr("msg_name_required_song"))
             return
 
         ok, err = write_track_metadata(
             self._path, title, artist, album, self._cover_bytes,
         )
         if not ok:
-            QMessageBox.critical(self, "Could not save metadata", err)
+            QMessageBox.critical(self, tr("msg_save_failed_title"), err)
             return
         if err:
-            QMessageBox.information(self, "Saved with note", err)
+            QMessageBox.information(self, tr("msg_saved_with_note_title"), err)
         self.accept()
 
 
 # ==================================================================
-#  In-window playlist edit page
+#  Playlist edit page
 # ==================================================================
 class PlaylistEditPage(QWidget):
     saved     = pyqtSignal(str, str, str)
@@ -901,16 +1190,16 @@ class PlaylistEditPage(QWidget):
         root.setSpacing(12)
 
         top = QHBoxLayout()
-        self.btn_back = QPushButton("←  Back")
+        self.btn_back = QPushButton(tr("btn_back"))
         self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_back.clicked.connect(self.cancelled.emit)
         top.addWidget(self.btn_back)
         top.addStretch(1)
 
-        title = QLabel("Edit playlist")
-        tf = title.font(); tf.setBold(True); tf.setPointSize(14)
-        title.setFont(tf)
-        top.addWidget(title)
+        self.title_lbl = QLabel(tr("edit_playlist_title"))
+        tf = self.title_lbl.font(); tf.setBold(True); tf.setPointSize(14)
+        self.title_lbl.setFont(tf)
+        top.addWidget(self.title_lbl)
         top.addStretch(1)
         top.addWidget(QLabel(" " * 6))
         root.addLayout(top)
@@ -925,9 +1214,9 @@ class PlaylistEditPage(QWidget):
 
         cbtn_col = QVBoxLayout()
         cbtn_col.setSpacing(6)
-        self.btn_choose_cover = QPushButton("Choose image…")
+        self.btn_choose_cover = QPushButton(tr("btn_choose_image"))
         self.btn_choose_cover.clicked.connect(self._choose_cover)
-        self.btn_clear_cover = QPushButton("Clear cover")
+        self.btn_clear_cover = QPushButton(tr("btn_clear_cover"))
         self.btn_clear_cover.clicked.connect(self._clear_cover)
         cbtn_col.addWidget(self.btn_choose_cover)
         cbtn_col.addWidget(self.btn_clear_cover)
@@ -936,14 +1225,16 @@ class PlaylistEditPage(QWidget):
         cover_row.addStretch(1)
         root.addLayout(cover_row)
 
-        root.addWidget(QLabel("Name"))
+        self.lbl_name = QLabel(tr("label_name"))
+        root.addWidget(self.lbl_name)
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Playlist name")
+        self.name_edit.setPlaceholderText(tr("dlg_playlist_name_placeholder"))
         root.addWidget(self.name_edit)
 
-        root.addWidget(QLabel("Description"))
+        self.lbl_desc = QLabel(tr("label_description"))
+        root.addWidget(self.lbl_desc)
         self.desc_edit = QPlainTextEdit()
-        self.desc_edit.setPlaceholderText("Optional description…")
+        self.desc_edit.setPlaceholderText(tr("placeholder_description"))
         self.desc_edit.setFixedHeight(100)
         root.addWidget(self.desc_edit)
 
@@ -951,9 +1242,9 @@ class PlaylistEditPage(QWidget):
 
         actions = QHBoxLayout()
         actions.addStretch(1)
-        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel = QPushButton(tr("btn_cancel"))
         self.btn_cancel.clicked.connect(self.cancelled.emit)
-        self.btn_save = QPushButton("Save")
+        self.btn_save = QPushButton(tr("btn_save"))
         self.btn_save.setDefault(True)
         self.btn_save.clicked.connect(self._on_save)
         self.btn_save.setStyleSheet("""
@@ -977,6 +1268,18 @@ class PlaylistEditPage(QWidget):
         apply_rounded_cover(self.cover_lbl, None,
                             EDIT_COVER, radius=14, placeholder_pt=34)
 
+    def retranslate(self):
+        self.btn_back.setText(tr("btn_back"))
+        self.title_lbl.setText(tr("edit_playlist_title"))
+        self.btn_choose_cover.setText(tr("btn_choose_image"))
+        self.btn_clear_cover.setText(tr("btn_clear_cover"))
+        self.lbl_name.setText(tr("label_name"))
+        self.name_edit.setPlaceholderText(tr("dlg_playlist_name_placeholder"))
+        self.lbl_desc.setText(tr("label_description"))
+        self.desc_edit.setPlaceholderText(tr("placeholder_description"))
+        self.btn_cancel.setText(tr("btn_cancel"))
+        self.btn_save.setText(tr("btn_save"))
+
     def load(self, name: str, description: str, cover_b64: str | None):
         self.name_edit.setText(name)
         self.desc_edit.setPlainText(description or "")
@@ -987,19 +1290,19 @@ class PlaylistEditPage(QWidget):
 
     def _choose_cover(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Choose cover", "",
+            self, tr("btn_choose_image"), "",
             "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;All files (*)")
         if not path:
             return
         pix = scaled_pixmap_from_file(path, PL_COVER_SAVE)
         if pix is None:
-            QMessageBox.warning(self, "Could not load image",
-                                "Qt could not decode this image file.")
+            QMessageBox.warning(self, tr("msg_image_load_title"),
+                                tr("msg_image_load"))
             return
         b64 = encode_pixmap_b64(pix)
         if not b64:
-            QMessageBox.warning(self, "Encode failed",
-                                "Could not encode cover image.")
+            QMessageBox.warning(self, tr("msg_encode_failed_title"),
+                                tr("msg_encode_failed"))
             return
         self._cover_b64 = b64
         apply_rounded_cover(self.cover_lbl, pix,
@@ -1019,12 +1322,89 @@ class PlaylistEditPage(QWidget):
 
 
 # ==================================================================
+#  Settings page
+# ==================================================================
+class SettingsPage(QWidget):
+    language_changed = pyqtSignal(str)
+    closed           = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._building = False
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(14)
+
+        # Top bar
+        top = QHBoxLayout()
+        self.title_lbl = QLabel(tr("settings"))
+        tf = self.title_lbl.font(); tf.setBold(True); tf.setPointSize(18)
+        self.title_lbl.setFont(tf)
+        top.addWidget(self.title_lbl)
+        top.addStretch(1)
+
+        self.btn_close = QPushButton(tr("btn_close"))
+        self.btn_close.clicked.connect(self.closed.emit)
+        top.addWidget(self.btn_close)
+        root.addLayout(top)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        root.addWidget(sep)
+
+        # Language section
+        self.section_lang = QLabel(tr("language"))
+        sf = self.section_lang.font(); sf.setBold(True); sf.setPointSize(12)
+        self.section_lang.setFont(sf)
+        root.addWidget(self.section_lang)
+
+        self.lang_combo = QComboBox()
+        self.lang_combo.setMinimumWidth(220)
+        for code, name in LANGUAGES:
+            self.lang_combo.addItem(name, code)
+        self.lang_combo.currentIndexChanged.connect(self._on_lang_changed)
+        root.addWidget(self.lang_combo)
+
+        self.hint_lbl = QLabel(tr("settings_hint"))
+        hf = self.hint_lbl.font(); hf.setPointSize(max(8, hf.pointSize() - 1))
+        self.hint_lbl.setFont(hf)
+        self.hint_lbl.setStyleSheet("color: palette(placeholder-text);")
+        self.hint_lbl.setWordWrap(True)
+        root.addWidget(self.hint_lbl)
+
+        root.addStretch(1)
+
+    def _on_lang_changed(self, idx: int):
+        if self._building:
+            return
+        code = self.lang_combo.itemData(idx)
+        if code:
+            self.language_changed.emit(code)
+
+    def load(self, current_lang: str):
+        self._building = True
+        for i in range(self.lang_combo.count()):
+            if self.lang_combo.itemData(i) == current_lang:
+                self.lang_combo.setCurrentIndex(i)
+                break
+        self._building = False
+        self.retranslate()
+
+    def retranslate(self):
+        self.title_lbl.setText(tr("settings"))
+        self.section_lang.setText(tr("language"))
+        self.hint_lbl.setText(tr("settings_hint"))
+        self.btn_close.setText(tr("btn_close"))
+
+
+# ==================================================================
 #  Main window
 # ==================================================================
 class MP3Player(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("MP3 Player")
         self.resize(1040, 700)
 
         self.player = QMediaPlayer()
@@ -1040,7 +1420,12 @@ class MP3Player(QMainWindow):
         self._editing_playlist: str | None = None
         self._row_cache: dict[str, tuple[dict, QPixmap | None]] = {}
 
+        # Load settings (including language) BEFORE building the UI so that
+        # all tr() calls in _build_ui use the right language.
+        self.settings: dict = {"language": "en"}
         self._load_settings()
+        set_language(self.settings.get("language", "en"))
+
         if not self.playlists:
             self.playlists["Library"] = self._blank_playlist()
 
@@ -1048,6 +1433,7 @@ class MP3Player(QMainWindow):
         self._connect_signals()
         self._setup_shortcuts()
 
+        self.setWindowTitle(tr("app_title"))
         self._refresh_playlist_view()
         self._select_initial_playlist()
 
@@ -1094,13 +1480,14 @@ class MP3Player(QMainWindow):
 
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
-        header.addWidget(QLabel("Playlists"))
+        self.lbl_playlists = QLabel(tr("playlists"))
+        header.addWidget(self.lbl_playlists)
         header.addStretch(1)
 
         self.btn_add_pl = QPushButton("+")
         self.btn_add_pl.setFixedSize(26, 26)
         self.btn_add_pl.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_add_pl.setToolTip("New playlist")
+        self.btn_add_pl.setToolTip(tr("new_playlist_tip"))
         self.btn_add_pl.setStyleSheet("""
             QPushButton {
                 border: 1px solid palette(mid);
@@ -1108,6 +1495,7 @@ class MP3Player(QMainWindow):
                 font-size: 16px; font-weight: bold;
                 padding: 0px;
                 background: palette(button);
+                min-height: 0px; min-width: 0px;
             }
             QPushButton:hover {
                 background: palette(highlight);
@@ -1117,6 +1505,28 @@ class MP3Player(QMainWindow):
             QPushButton:pressed { background: palette(dark); }
         """)
         header.addWidget(self.btn_add_pl)
+
+        self.btn_settings = QPushButton("⚙")
+        self.btn_settings.setFixedSize(26, 26)
+        self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_settings.setToolTip(tr("settings_tip"))
+        self.btn_settings.setStyleSheet("""
+            QPushButton {
+                border: 1px solid palette(mid);
+                border-radius: 13px;
+                font-size: 14px;
+                padding: 0px;
+                background: palette(button);
+                min-height: 0px; min-width: 0px;
+            }
+            QPushButton:hover {
+                background: palette(highlight);
+                color: palette(highlighted-text);
+                border: 1px solid palette(highlight);
+            }
+            QPushButton:pressed { background: palette(dark); }
+        """)
+        header.addWidget(self.btn_settings)
         ll.addLayout(header)
 
         self.playlist_list = QListWidget()
@@ -1138,7 +1548,7 @@ class MP3Player(QMainWindow):
         self.right_stack = QStackedWidget()
         rl.addWidget(self.right_stack)
 
-        # page 0: view
+        # --- page 0: playlist view ---
         page_view = QWidget()
         pv = QVBoxLayout(page_view)
         pv.setContentsMargins(0, 0, 0, 0)
@@ -1151,13 +1561,10 @@ class MP3Player(QMainWindow):
         self.list_widget.setAlternatingRowColors(True)
         self.list_widget.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list_widget.setToolTip(
-            "Drop audio files here to add them to the current playlist.\n"
-            "Drag tracks to reorder them.\n"
-            "Right-click a track for more options.")
+        self.list_widget.setToolTip(tr("songs_tooltip"))
         pv.addWidget(self.list_widget, stretch=1)
 
-        self.title_label = QLabel("No track loaded")
+        self.title_label = QLabel(tr("no_track_loaded"))
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setWordWrap(True)
         self.title_label.setStyleSheet("font-weight: bold; font-size: 13px;")
@@ -1212,11 +1619,17 @@ class MP3Player(QMainWindow):
         pv.addLayout(controls)
         self.right_stack.addWidget(page_view)
 
-        # page 1: edit
+        # --- page 1: playlist edit ---
         self.edit_page = PlaylistEditPage()
         self.edit_page.saved.connect(self._on_playlist_edit_saved)
         self.edit_page.cancelled.connect(self._close_edit_page)
         self.right_stack.addWidget(self.edit_page)
+
+        # --- page 2: settings ---
+        self.settings_page = SettingsPage()
+        self.settings_page.language_changed.connect(self._on_language_changed)
+        self.settings_page.closed.connect(self._close_settings_page)
+        self.right_stack.addWidget(self.settings_page)
 
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 0)
@@ -1232,7 +1645,6 @@ class MP3Player(QMainWindow):
         bg       = "palette(highlight)" if primary else "palette(button)"
         bg_hover = "palette(highlight)" if primary else "palette(midlight)"
         bg_dn    = "palette(dark)"
-        # widget-level stylesheet — overrides the app-wide QPushButton rule
         btn.setStyleSheet(f"""
             QPushButton {{
                 border-radius: {radius}px;
@@ -1278,6 +1690,7 @@ class MP3Player(QMainWindow):
         self.playlist_list.customContextMenuRequested.connect(
             self._on_playlist_context_menu)
         self.btn_add_pl.clicked.connect(self.new_playlist)
+        self.btn_settings.clicked.connect(self.open_settings_page)
 
         self.list_widget.files_dropped.connect(self._on_files_dropped)
         self.list_widget.rows_reordered.connect(self._on_rows_reordered)
@@ -1309,6 +1722,7 @@ class MP3Player(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Down"),  self, lambda: self._move_selected(+1))
         QShortcut(QKeySequence("Delete"),     self, self.remove_selected)
         QShortcut(QKeySequence("Ctrl+E"),     self, self._edit_current_track)
+        QShortcut(QKeySequence("Ctrl+,"),     self, self.open_settings_page)
 
     # ==============================================================
     #  Persistence
@@ -1323,18 +1737,29 @@ class MP3Player(QMainWindow):
             print(f"[mp3 player] could not read {SETTINGS_FILE}: {e}")
             return
 
+        if not isinstance(data, dict):
+            return
+
+        # language
+        lang = data.get("language")
+        if isinstance(lang, str) and lang in TRANSLATIONS:
+            self.settings["language"] = lang
+
+        # playlists (with backward compatibility)
         raw = None
-        if isinstance(data, dict) and isinstance(data.get("playlists"), dict):
+        if isinstance(data.get("playlists"), dict):
             raw = data["playlists"]
             last = data.get("last_playlist")
             self.current_playlist = last if last in raw else None
-        elif isinstance(data, dict):
-            raw = data
+        else:
+            raw = data  # very old flat format
 
         if not isinstance(raw, dict):
             return
 
         for name, value in raw.items():
+            if name in ("version", "language", "last_playlist", "playlists"):
+                continue
             name = str(name)
             if isinstance(value, list):
                 tracks = [str(p) for p in value if isinstance(p, str)]
@@ -1355,6 +1780,7 @@ class MP3Player(QMainWindow):
     def _save_settings(self):
         payload = {
             "version": SETTINGS_VERSION,
+            "language": self.settings.get("language", "en"),
             "playlists": self.playlists,
             "last_playlist": self.current_playlist,
         }
@@ -1370,6 +1796,49 @@ class MP3Player(QMainWindow):
         self.player.stop()
         self._save_settings()
         super().closeEvent(event)
+
+    # ==============================================================
+    #  Language / retranslation
+    # ==============================================================
+    def open_settings_page(self):
+        if self.right_stack.currentIndex() == 1:
+            self._close_edit_page()
+        self.settings_page.load(self.settings.get("language", "en"))
+        self.right_stack.setCurrentIndex(2)
+
+    def _close_settings_page(self):
+        self.right_stack.setCurrentIndex(0)
+
+    def _on_language_changed(self, code: str):
+        if code == self.settings.get("language"):
+            return
+        set_language(code)
+        self.settings["language"] = code
+        self._save_settings()
+        self._retranslate_ui()
+
+    def _retranslate_ui(self):
+        # Window title
+        self.setWindowTitle(tr("app_title"))
+
+        # Sidebar
+        self.lbl_playlists.setText(tr("playlists"))
+        self.btn_add_pl.setToolTip(tr("new_playlist_tip"))
+        self.btn_settings.setToolTip(tr("settings_tip"))
+
+        # Song list
+        self.list_widget.setToolTip(tr("songs_tooltip"))
+
+        # Now-playing label — only translate if it's the "no track" state
+        if self.current_index < 0:
+            self.title_label.setText(tr("no_track_loaded"))
+
+        # Settings page
+        self.settings_page.retranslate()
+
+        # Rebuild the views so row widgets use the new language
+        self._refresh_playlist_view()
+        self._refresh_songs_view()
 
     # ==============================================================
     #  Metadata cache
@@ -1475,7 +1944,7 @@ class MP3Player(QMainWindow):
         self.current_playlist = name
         self.player.stop()
         self.current_index = -1
-        self.title_label.setText("No track loaded")
+        self.title_label.setText(tr("no_track_loaded"))
         self._refresh_songs_view()
         self._save_settings()
 
@@ -1485,14 +1954,15 @@ class MP3Player(QMainWindow):
             return
         name = item.data(Qt.ItemDataRole.UserRole)
         menu = QMenu(self)
-        menu.addAction("Edit…",     lambda n=name: self.open_edit_page(n))
+        menu.addAction(tr("menu_edit"),     lambda n=name: self.open_edit_page(n))
         menu.addSeparator()
-        menu.addAction("Rename…",   lambda n=name: self.rename_playlist(n))
-        menu.addAction("Delete",    lambda n=name: self.delete_playlist(n))
+        menu.addAction(tr("menu_rename"),   lambda n=name: self.rename_playlist(n))
+        menu.addAction(tr("menu_delete"),   lambda n=name: self.delete_playlist(n))
         menu.addSeparator()
-        menu.addAction("Set cover…", lambda n=name: self.set_playlist_cover(n))
+        menu.addAction(tr("menu_set_cover"), lambda n=name: self.set_playlist_cover(n))
         if self._pl_cover(name):
-            menu.addAction("Clear cover", lambda n=name: self.clear_playlist_cover(n))
+            menu.addAction(tr("menu_clear_cover"),
+                           lambda n=name: self.clear_playlist_cover(n))
         menu.exec(self.playlist_list.mapToGlobal(pos))
 
     def new_playlist(self):
@@ -1501,8 +1971,8 @@ class MP3Player(QMainWindow):
             return
         name = dlg.name()
         if name in self.playlists:
-            QMessageBox.warning(self, "Already exists",
-                                f'Playlist "{name}" already exists.')
+            QMessageBox.warning(self, tr("msg_already_exists_title"),
+                                tr("msg_already_exists", name=name))
             return
         self.playlists[name] = self._blank_playlist()
         self.playlists[name]["cover"] = dlg.cover_b64()
@@ -1510,7 +1980,7 @@ class MP3Player(QMainWindow):
         self._save_settings()
         self.player.stop()
         self.current_index = -1
-        self.title_label.setText("No track loaded")
+        self.title_label.setText(tr("no_track_loaded"))
         self._refresh_playlist_view()
         self._refresh_songs_view()
 
@@ -1518,15 +1988,17 @@ class MP3Player(QMainWindow):
         old = name or self.current_playlist
         if not old or old not in self.playlists:
             return
-        new, ok = QInputDialog.getText(self, "Rename playlist", "New name:", text=old)
+        new, ok = QInputDialog.getText(
+            self, tr("dlg_rename_playlist"),
+            tr("dlg_new_name_label"), text=old)
         if not ok:
             return
         new = new.strip()
         if not new or new == old:
             return
         if new in self.playlists:
-            QMessageBox.warning(self, "Already exists",
-                                f'Playlist "{new}" already exists.')
+            QMessageBox.warning(self, tr("msg_already_exists_title"),
+                                tr("msg_already_exists", name=new))
             return
         self.playlists = {new if k == old else k: v for k, v in self.playlists.items()}
         if self.current_playlist == old:
@@ -1540,14 +2012,14 @@ class MP3Player(QMainWindow):
         if not target or target not in self.playlists:
             return
         reply = QMessageBox.question(
-            self, "Delete playlist",
-            f'Delete playlist "{target}"?\n(Files on disk are NOT deleted.)')
+            self, tr("dlg_delete_playlist"),
+            tr("dlg_delete_playlist_msg", name=target))
         if reply != QMessageBox.StandardButton.Yes:
             return
         if target == self.current_playlist:
             self.player.stop()
             self.current_index = -1
-            self.title_label.setText("No track loaded")
+            self.title_label.setText(tr("no_track_loaded"))
         del self.playlists[target]
         if self.current_playlist == target:
             self.current_playlist = next(iter(self.playlists), None)
@@ -1560,19 +2032,19 @@ class MP3Player(QMainWindow):
         if not target or target not in self.playlists:
             return
         path, _ = QFileDialog.getOpenFileName(
-            self, f'Choose cover for "{target}"', "",
+            self, tr("btn_choose_image"), "",
             "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;All files (*)")
         if not path:
             return
         pix = scaled_pixmap_from_file(path, PL_COVER_SAVE)
         if pix is None:
-            QMessageBox.warning(self, "Could not load image",
-                                "Qt could not decode this image file.")
+            QMessageBox.warning(self, tr("msg_image_load_title"),
+                                tr("msg_image_load"))
             return
         b64 = encode_pixmap_b64(pix)
         if not b64:
-            QMessageBox.warning(self, "Encode failed",
-                                "Could not encode cover image.")
+            QMessageBox.warning(self, tr("msg_encode_failed_title"),
+                                tr("msg_encode_failed"))
             return
         self.playlists[target]["cover"] = b64
         self._save_settings()
@@ -1616,12 +2088,12 @@ class MP3Player(QMainWindow):
 
         new_name = new_name.strip()
         if not new_name:
-            QMessageBox.warning(self, "Name required",
-                                "Playlist name cannot be empty.")
+            QMessageBox.warning(self, tr("msg_name_required_title"),
+                                tr("msg_playlist_empty"))
             return
         if new_name != old_name and new_name in self.playlists:
-            QMessageBox.warning(self, "Name taken",
-                                f'Playlist "{new_name}" already exists.')
+            QMessageBox.warning(self, tr("msg_name_taken_title"),
+                                tr("msg_already_exists", name=new_name))
             return
 
         data = self.playlists[old_name]
@@ -1653,8 +2125,8 @@ class MP3Player(QMainWindow):
     def edit_track_metadata(self, item: QListWidgetItem):
         path = item.data(Qt.ItemDataRole.UserRole)
         if not path or not os.path.exists(path):
-            QMessageBox.warning(self, "File missing",
-                                "Cannot edit metadata — file not found.")
+            QMessageBox.warning(self, tr("msg_file_missing_title"),
+                                tr("msg_cannot_edit_missing"))
             return
 
         meta, cover_pix = self._get_row_data(path)
@@ -1683,8 +2155,8 @@ class MP3Player(QMainWindow):
     # ==============================================================
     def _on_files_dropped(self, paths: list[str]):
         if not self.current_playlist:
-            QMessageBox.information(self, "No playlist",
-                                    "Create or select a playlist first.")
+            QMessageBox.information(self, tr("no_playlist_selected"),
+                                    tr("drop_to_add"))
             return
         pl = self.playlists[self.current_playlist]["tracks"]
         added = 0
@@ -1763,21 +2235,20 @@ class MP3Player(QMainWindow):
         menu = QMenu(self)
 
         act_edit = menu.addAction(
-            "Edit metadata…",
+            tr("menu_edit_metadata"),
             lambda it=item: self.edit_track_metadata(it),
         )
         act_edit.setEnabled(single)
         menu.addSeparator()
 
-        label = "Remove from playlist" if single else \
-                f"Remove {len(selection)} tracks from playlist"
-        menu.addAction(label, lambda rows=selection: self.remove_rows(rows))
+        menu.addAction(tr_remove_tracks(len(selection)),
+                       lambda rows=selection: self.remove_rows(rows))
         menu.addSeparator()
 
-        act_up   = menu.addAction("Move up",        lambda: self._move_selected(-1))
-        act_down = menu.addAction("Move down",      lambda: self._move_selected(+1))
-        act_top  = menu.addAction("Move to top",    lambda: self._move_to(0))
-        act_bot  = menu.addAction("Move to bottom", lambda: self._move_to(len(pl) - 1))
+        act_up   = menu.addAction(tr("menu_move_up"),     lambda: self._move_selected(-1))
+        act_down = menu.addAction(tr("menu_move_down"),   lambda: self._move_selected(+1))
+        act_top  = menu.addAction(tr("menu_move_top"),    lambda: self._move_to(0))
+        act_bot  = menu.addAction(tr("menu_move_bottom"), lambda: self._move_to(len(pl) - 1))
 
         if r == 0:
             act_up.setEnabled(False); act_top.setEnabled(False)
@@ -1800,7 +2271,7 @@ class MP3Player(QMainWindow):
         if self.current_index in rows:
             self.player.stop()
             self.current_index = -1
-            self.title_label.setText("No track loaded")
+            self.title_label.setText(tr("no_track_loaded"))
 
         for r in rows:
             del pl[r]
@@ -1872,7 +2343,8 @@ class MP3Player(QMainWindow):
             return
         path = pl[index]
         if not os.path.exists(path):
-            QMessageBox.warning(self, "File missing", f"File not found:\n{path}")
+            QMessageBox.warning(self, tr("msg_file_missing_title"),
+                                tr("msg_file_missing", path=path))
             return
         self.current_index = index
         self.player.setSource(QUrl.fromLocalFile(path))
@@ -1952,7 +2424,8 @@ class MP3Player(QMainWindow):
 
     def _on_error(self, error, error_string):
         if error != QMediaPlayer.Error.NoError:
-            QMessageBox.warning(self, "Playback error", error_string or str(error))
+            QMessageBox.warning(self, tr("msg_playback_error_title"),
+                                error_string or str(error))
 
     @staticmethod
     def _fmt(ms):
@@ -1969,9 +2442,6 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("MP3 Player")
 
-    # Global rounded-button style. Widget-level stylesheets (used by the
-    # circular transport buttons and accent Save buttons) take precedence,
-    # so they keep their own border-radius.
     app.setStyleSheet("""
         QPushButton {
             border-radius: 12px;
